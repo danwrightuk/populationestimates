@@ -15,9 +15,6 @@ library(tmap)
 set.seed(420)
 my_spdf <- readOGR(dsn="C:/Users/Danie/Desktop/MSOA2011", layer="Middle_Layer_Super_Output_Areas__December_2011__Boundaries")
 spdf_fort <- fortify(my_spdf, region="msoa11cd")
-setwd("C:/Users/Danie/Desktop/MSOA2011")
-poly_lmsoa <- raster::shapefile("Middle_Layer_Super_Output_Areas__December_2011__Boundaries")
-
 
 setwd("C:/Users/Danie/Desktop/populationestimates/")
 popData <- read.csv(file = 'C:/Users/Danie/Desktop/populationestimates/popestimates.csv', header=TRUE)
@@ -33,7 +30,19 @@ saliscensus$All.usual.residents <- as.integer(gsub(",","",saliscensus$All.usual.
 colnames(saliscensus)[which(names(saliscensus) == "MSOA.Code")] <- "id"
 censusmerged <-merge(spdf_fort,saliscensus, by="id")
 final.census.data<-censusmerged[order(censusmerged$order), ]
-final.census.data$All.Ages <- as.integer(gsub(",","",final.data$All.Ages))
+
+censusandpop <- merge(salispop, saliscensus, by="MSOA.Name")
+censusandpop$All.usual.residents <- as.integer(gsub(",","",censusandpop$All.usual.residents))
+censusandpop$All.Ages <- as.integer(gsub(",","",censusandpop$All.Ages))
+
+censusandpop.res <- transform(censusandpop, new.col = All.Ages - All.usual.residents)
+
+censusandpop$V114 <- NA
+censusandpop$V114 <- as.vector(censusandpop$V105) - as.vector(censusandpop$V7)
+
+bothmerged <-merge(spdf_fort,censusandpop.res, by="id")
+final.both<-bothmerged[order(bothmerged$order), ]
+
 
 q <- ggplot(data=final.data, aes(long, lat, group = group)) +
   geom_polygon(aes(fill = All.Ages),
@@ -88,4 +97,31 @@ p <- ggplot(data=final.census.data, aes(long, lat, group = group)) +
 
 fig3 <- ggplotly(p)
 fig3
+
+difference <- ggplot(data=final.both, aes(long, lat, group = group)) +
+  geom_polygon(aes(fill = new.col),
+               colour = alpha("black", 1/2), size = 0.3)+
+  theme_void()+
+  labs(
+    title = "Estimated Population Difference",
+    subtitle = "",
+    caption = "World"
+  ) +
+  scale_fill_distiller(palette = "RdYlGn" , na.value="white", direction=1, n=9, name="Population", guide = guide_colorbar( keyheight = unit(3, units = "mm"), keywidth=unit(12, units = "mm")) ) +
+  theme(
+    text = element_text(color = "#22211d"),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA),
+    legend.background = element_rect(fill = "#f5f5f2", color = NA),
+    
+    plot.title = element_text(size= 16, hjust=0.01, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+    plot.subtitle = element_text(size= 14, hjust=0.01, color = "#4e4d47", margin = margin(b = -0.1, t = 0.43, l = 2, unit = "cm")),
+    plot.caption = element_text( size=12, color = "#4e4d47", margin = margin(b = 0.3, r=-99, unit = "cm") ),
+    
+    legend.position = c(0.7, 0.09)
+  )  +
+  coord_map() #Adds Mercator Projection
+
+fig4 <- ggplotly(difference)
+fig4
 
